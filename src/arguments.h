@@ -54,6 +54,12 @@ enum Ring {
     RING_USER
 };
 
+enum EventKind {
+    EK_CPU   = 1,
+    EK_ALLOC = 2,
+    EK_LOCK  = 4
+};
+
 enum Style {
     STYLE_SIMPLE     = 1,
     STYLE_DOTTED     = 2,
@@ -106,7 +112,8 @@ class Arguments {
     Action _action;
     Counter _counter;
     Ring _ring;
-    const char* _event;
+    int _events;
+    const char* _event_desc;
     long _interval;
     int  _jstackdepth;
     int _framebuf;
@@ -132,7 +139,8 @@ class Arguments {
         _action(ACTION_NONE),
         _counter(COUNTER_SAMPLES),
         _ring(RING_ANY),
-        _event(EVENT_CPU),
+        _events(0),
+        _event_desc(NULL),
         _interval(0),
         _jstackdepth(DEFAULT_JSTACKDEPTH),
         _framebuf(DEFAULT_FRAMEBUF),
@@ -158,6 +166,8 @@ class Arguments {
     void save(Arguments& other);
 
     Error parse(const char* args);
+
+    bool addEvent(const char* event);
 
     friend class FrameName;
 };

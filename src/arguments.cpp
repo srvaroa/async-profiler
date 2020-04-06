@@ -160,7 +160,10 @@ Error Arguments::parse(const char* args) {
                 if (value == NULL || value[0] == 0) {
                     return Error("event must not be empty");
                 }
-                _event = value;
+
+                if (!addEvent(value)) {
+                    return Error("multiple incompatible events");
+                }
 
             CASE("interval")
                 if (value == NULL || (_interval = parseUnits(value)) <= 0) {
@@ -251,6 +254,21 @@ Error Arguments::parse(const char* args) {
     }
 
     return Error::OK;
+}
+
+bool Arguments::addEvent(const char* event) {
+    if (strcmp(event, EVENT_ALLOC) == 0) {
+        _events |= EK_ALLOC;
+    } else if (strcmp(event, EVENT_LOCK) == 0) {
+        _events |= EK_LOCK;
+    } else {
+        if (_events & EK_CPU) {
+            return false;
+        }
+        _events |= EK_CPU;
+        _event_desc = event;
+    }
+    return true;
 }
 
 // The linked list of string offsets is embedded right into _buf array

@@ -440,7 +440,9 @@ void PerfEvents::signalHandler(int signo, siginfo_t* siginfo, void* ucontext) {
             }
     }
 
-    Profiler::_instance.recordSample(ucontext, counter, 0, NULL);
+    ExecutionEvent event;
+    Profiler::_instance.recordSample(ucontext, counter, 0, &event);
+
     ioctl(siginfo->si_fd, PERF_EVENT_IOC_RESET, 0);
     ioctl(siginfo->si_fd, PERF_EVENT_IOC_REFRESH, 1);
 }
@@ -457,7 +459,7 @@ const char* PerfEvents::units() {
 }
 
 Error PerfEvents::check(Arguments& args) {
-    PerfEventType* event_type = PerfEventType::forName(args._event);
+    PerfEventType* event_type = PerfEventType::forName(args._event_desc);
     if (event_type == NULL) {
         return Error("Unsupported event type");
     }
@@ -494,7 +496,7 @@ Error PerfEvents::check(Arguments& args) {
 }
 
 Error PerfEvents::start(Arguments& args) {
-    _event_type = PerfEventType::forName(args._event);
+    _event_type = PerfEventType::forName(args._event_desc);
     if (_event_type == NULL) {
         return Error("Unsupported event type");
     }

@@ -54,10 +54,6 @@ class VMStructs {
             && _symbol_body_offset >= 0
             && _class_klass_offset >= 0;
     }
-
-    static bool hasPermGen() {
-        return _has_perm_gen;
-    }
 };
 
 

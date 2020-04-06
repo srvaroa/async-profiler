@@ -209,16 +209,16 @@ const char* FrameName::name(ASGCT_CallFrame& frame, bool for_matching) {
         case BCI_NATIVE_FRAME:
             return cppDemangle((const char*)frame.method_id);
 
-        case BCI_SYMBOL: {
-            VMSymbol* symbol = (VMSymbol*)frame.method_id;
-            char* class_name = javaClassName(symbol->body(), symbol->length(), _style | STYLE_DOTTED);
-            return for_matching ? class_name : strcat(class_name, _style & STYLE_DOTTED ? "" : "_[i]");
-        }
-
-        case BCI_SYMBOL_OUTSIDE_TLAB: {
-            VMSymbol* symbol = (VMSymbol*)((uintptr_t)frame.method_id ^ 1);
-            char* class_name = javaClassName(symbol->body(), symbol->length(), _style | STYLE_DOTTED);
-            return for_matching ? class_name : strcat(class_name, _style & STYLE_DOTTED ? " (out)" : "_[k]");
+        case BCI_ALLOC:
+        case BCI_ALLOC_OUTSIDE_TLAB:
+        case BCI_LOCK:
+        case BCI_PARK: {
+            const char* symbol = (const char*)((intptr_t)frame.method_id & ~1);
+            char* class_name = javaClassName(symbol, strlen(symbol), _style | STYLE_DOTTED);
+            if (!for_matching && !(_style & STYLE_DOTTED)) {
+                strcat(class_name, frame.bci == BCI_ALLOC_OUTSIDE_TLAB ? "_[k]" : "_[i]");
+            }
+            return class_name;
         }
 
         case BCI_THREAD_ID: {

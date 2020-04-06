@@ -171,14 +171,20 @@ void Profiler::onThreadStart(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
     int tid = OS::threadId();
     _thread_filter.remove(tid);
     updateThreadName(jvmti, jni, thread);
-    _engine->onThreadStart(tid);
+
+    if (_engine == &perf_events) {
+        PerfEvents::createForThread(tid);
+    }
 }
 
 void Profiler::onThreadEnd(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
     int tid = OS::threadId();
     _thread_filter.remove(tid);
     updateThreadName(jvmti, jni, thread);
-    _engine->onThreadEnd(tid);
+
+    if (_engine == &perf_events) {
+        PerfEvents::destroyForThread(tid);
+    }
 }
 
 const char* Profiler::asgctError(int code) {
@@ -487,11 +493,14 @@ AddressType Profiler::getAddressType(instruction_t* pc) {
     return ADDR_UNKNOWN;
 }
 
-void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, jmethodID event, ThreadState thread_state) {
+void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, Event* event) {
     int tid = OS::threadId();
 
-    u64 lock_index = atomicInc(_total_samples) % CONCURRENCY_LEVEL;
-    if (!_locks[lock_index].tryLock()) {
+    u32 lock_index = ((u32)atomicInc(_total_samples)) % CONCURRENCY_LEVEL;
+    if (!_locks[lock_index].tryLock() &&
+        !_locks[(lock_index += 1) % CONCURRENCY_LEVEL].tryLock() &&
+        !_locks[(lock_index += 2) % CONCURRENCY_LEVEL].tryLock())
+    {
         // Too many concurrent signals already
         atomicInc(_failures[-ticks_skipped]);
 
@@ -509,7 +518,8 @@ void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, jmetho
 
     int num_frames = 0;
     if (event != NULL) {
-        num_frames = makeEventFrame(frames, event_type, event);
+        // TODO: skip event for JFR
+        // num_frames = makeEventFrame(frames, event_type, event);
     }
     if (_cstack) {
         num_frames += getNativeTrace(ucontext, frames + num_frames, tid, &need_java_trace);
@@ -523,7 +533,7 @@ void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, jmetho
         num_frames += getJavaTraceAsync(ucontext, frames + num_frames, _max_stack_depth);
     }
 
-    if (num_frames == 0 || (num_frames == 1 && event != NULL)) {
+    if (num_frames == 0 /* || (num_frames == 1 && event != NULL) */) {
         num_frames += makeEventFrame(frames + num_frames, BCI_ERROR, (jmethodID)"no_Java_frame");
     } else if (event_type == BCI_INSTRUMENT) {
         // Skip Instrument.recordSample() method
@@ -537,7 +547,7 @@ void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, jmetho
 
     storeMethod(frames[0].method_id, frames[0].bci, counter);
     int call_trace_id = storeCallTrace(num_frames, frames, counter);
-    _jfr.recordExecutionSample(lock_index, tid, call_trace_id, thread_state);
+    _jfr.recordEvent(lock_index, tid, call_trace_id, event_type, event, counter);
 
     _locks[lock_index].unlock();
 }
@@ -754,6 +764,12 @@ Error Profiler::start(Arguments& args, bool reset) {
         return Error("Profiler already started");
     }
 
+    if (args._events == 0) {
+        return Error("No profiling events specified");
+    } else if ((args._events & (args._events - 1)) && args._output != OUTPUT_JFR) {
+        return Error("Only JFR output supports multiple events");
+    }
+
     if (reset || _start_time == 0) {
         // Reset counters
         _total_samples = 0;
@@ -770,7 +786,9 @@ Error Profiler::start(Arguments& args, bool reset) {
         _frame_buffer_index = 0;
         _frame_buffer_overflow = false;
 
-        // Reset thread filter bitmaps
+        // Reset dicrionaries and bitmaps
+        _class_map.clear();
+        _symbol_map.clear();
         _thread_filter.clear();
 
         // Reset thread names and IDs
@@ -821,14 +839,18 @@ Error Profiler::start(Arguments& args, bool reset) {
         }
     }
 
-    _engine = selectEngine(args._event);
-    _cstack = args._cstack ? args._cstack == 'y' : _engine->requireNativeTrace();
+    _engine = selectEngine(args._event_desc);
+    _cstack = args._cstack != 'n';
 
     error = _engine->start(args);
     if (error) {
         _jfr.stop();
         return error;
     }
+
+    _events = args._events;
+    if (_events & EK_ALLOC) alloc_tracer.start(args);
+    if (_events & EK_LOCK) lock_tracer.start(args);
 
     // Thread events might be already enabled by PerfEvents::start
     switchThreadEvents(JVMTI_ENABLE);
@@ -844,6 +866,9 @@ Error Profiler::stop() {
     if (_state != RUNNING) {
         return Error("Profiler is not active");
     }
+
+    if (_events & EK_LOCK) lock_tracer.stop();
+    if (_events & EK_ALLOC) alloc_tracer.stop();
 
     _engine->stop();
 
@@ -873,7 +898,7 @@ Error Profiler::check(Arguments& args) {
         return error;
     }
 
-    _engine = selectEngine(args._event);
+    _engine = selectEngine(args._event_desc);
     return _engine->check(args);
 }
 
@@ -893,7 +918,7 @@ void Profiler::dumpSummary(std::ostream& out) {
             "Total samples       : %lld\n",
             _total_samples);
     out << buf;
-    
+
     double percent = 100.0 / _total_samples;
     for (int i = 1; i < ASGCT_FAILURE_TYPES; i++) {
         const char* err_string = asgctError(-i);
@@ -1059,7 +1084,7 @@ void Profiler::runInternal(Arguments& args, std::ostream& out) {
             if (error) {
                 out << error.message() << std::endl;
             } else {
-                out << "Started [" << args._event << "] profiling" << std::endl;
+                out << "Profiling started" << std::endl;
             }
             break;
         }
@@ -1068,7 +1093,7 @@ void Profiler::runInternal(Arguments& args, std::ostream& out) {
             if (error) {
                 out << error.message() << std::endl;
             } else {
-                out << "Stopped profiling after " << uptime() << " seconds. No dump options specified" << std::endl;
+                out << "Profiling stopped after " << uptime() << " seconds. No dump options specified" << std::endl;
             }
             break;
         }
@@ -1084,7 +1109,7 @@ void Profiler::runInternal(Arguments& args, std::ostream& out) {
         case ACTION_STATUS: {
             MutexLocker ml(_state_lock);
             if (_state == RUNNING) {
-                out << "[" << _engine->name() << "] profiling is running for " << uptime() << " seconds" << std::endl;
+                out << "Profiling is running for " << uptime() << " seconds" << std::endl;
             } else {
                 out << "Profiler is not active" << std::endl;
             }

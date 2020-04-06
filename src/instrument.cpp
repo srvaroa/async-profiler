@@ -505,7 +505,7 @@ Error Instrument::start(Arguments& args) {
         return Error("interval must be positive");
     }
 
-    setupTargetClassAndMethod(args._event);
+    setupTargetClassAndMethod(args._event_desc);
     _interval = args._interval ? args._interval : 1;
     _calls = 0;
     _enabled = true;
@@ -583,7 +583,8 @@ void JNICALL Instrument::ClassFileLoadHook(jvmtiEnv* jvmti, JNIEnv* jni,
 
 void Instrument::recordSample() {
     if (_interval <= 1 || ((atomicInc(_calls) + 1) % _interval) == 0) {
-        Profiler::_instance.recordSample(NULL, _interval, BCI_INSTRUMENT, NULL);
+        ExecutionEvent event;
+        Profiler::_instance.recordSample(NULL, _interval, BCI_INSTRUMENT, &event);
     }
 }
 

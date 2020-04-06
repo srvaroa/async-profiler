@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Andrei Pangin
+ * Copyright 2020 Andrei Pangin
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,28 +14,37 @@
  * limitations under the License.
  */
 
-#ifndef _FLIGHTRECORDER_H
-#define _FLIGHTRECORDER_H
+#ifndef _EVENT_H
+#define _EVENT_H
 
-#include "arch.h"
-#include "arguments.h"
-#include "event.h"
+#include "os.h"
 
-class Recording;
 
-class FlightRecorder {
-  private:
-    Recording* _rec;
-
-  public:
-    FlightRecorder() : _rec(NULL) {
-    }
-
-    Error start(const char* file);
-    void stop();
-
-    void recordEvent(int lock_index, int tid, int call_trace_id,
-                     int event_type, Event* event, u64 counter);
+class Event {
 };
 
-#endif // _FLIGHTRECORDER_H
+class ExecutionEvent : public Event {
+  public:
+    ThreadState _thread_state;
+
+    ExecutionEvent() : _thread_state(THREAD_RUNNING) {
+    }
+};
+
+class AllocEvent : public Event {
+  public:
+    const char* _class_name;
+    u64 _total_size;
+    u64 _instance_size;
+};
+
+class LockEvent : public Event {
+  public:
+    const char* _class_name;
+    u64 _start_time;
+    u64 _end_time;
+    uintptr_t _address;
+    long long _timeout;
+};
+
+#endif // _EVENT_H

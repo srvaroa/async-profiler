@@ -58,7 +58,10 @@ class AllocTracer : public Engine {
     static volatile u64 _allocated_bytes;
 
     static void signalHandler(int signo, siginfo_t* siginfo, void* ucontext);
-    static void recordAllocation(void* ucontext, StackFrame& frame, uintptr_t rklass, uintptr_t rsize, bool outside_tlab);
+
+    static void recordAllocation(void* ucontext, StackFrame& frame,
+                                 int event_type, uintptr_t rklass,
+                                 uintptr_t total_size, uintptr_t instance_size);
 
   public:
     const char* name() {

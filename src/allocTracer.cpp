@@ -77,20 +77,22 @@ void AllocTracer::signalHandler(int signo, siginfo_t* siginfo, void* ucontext) {
     // PC points either to BREAKPOINT instruction or to the next one
     if (frame.pc() - (uintptr_t)_in_new_tlab._entry <= sizeof(instruction_t)) {
         // send_allocation_in_new_tlab_event(KlassHandle klass, size_t tlab_size, size_t alloc_size)
-        recordAllocation(ucontext, frame, frame.arg0(), frame.arg1(), false);
+        recordAllocation(ucontext, frame, BCI_ALLOC, frame.arg0(), frame.arg1(), frame.arg2());
     } else if (frame.pc() - (uintptr_t)_outside_tlab._entry <= sizeof(instruction_t)) {
         // send_allocation_outside_tlab_event(KlassHandle klass, size_t alloc_size);
-        recordAllocation(ucontext, frame, frame.arg0(), frame.arg1(), true);
+        recordAllocation(ucontext, frame, BCI_ALLOC_OUTSIDE_TLAB, frame.arg0(), frame.arg1(), 0);
     } else if (frame.pc() - (uintptr_t)_in_new_tlab2._entry <= sizeof(instruction_t)) {
         // send_allocation_in_new_tlab(Klass* klass, HeapWord* obj, size_t tlab_size, size_t alloc_size, Thread* thread)
-        recordAllocation(ucontext, frame, frame.arg0(), frame.arg2(), false);
+        recordAllocation(ucontext, frame, BCI_ALLOC, frame.arg0(), frame.arg2(), frame.arg3());
     } else if (frame.pc() - (uintptr_t)_outside_tlab2._entry <= sizeof(instruction_t)) {
         // send_allocation_outside_tlab(Klass* klass, HeapWord* obj, size_t alloc_size, Thread* thread)
-        recordAllocation(ucontext, frame, frame.arg0(), frame.arg2(), true);
+        recordAllocation(ucontext, frame, BCI_ALLOC_OUTSIDE_TLAB, frame.arg0(), frame.arg2(), 0);
     }
 }
 
-void AllocTracer::recordAllocation(void* ucontext, StackFrame& frame, uintptr_t rklass, uintptr_t rsize, bool outside_tlab) {
+void AllocTracer::recordAllocation(void* ucontext, StackFrame& frame,
+                                   int event_type, uintptr_t rklass,
+                                   uintptr_t total_size, uintptr_t instance_size) {
     // Leave the trapped function by simulating "ret" instruction
     frame.ret();
 
@@ -98,7 +100,7 @@ void AllocTracer::recordAllocation(void* ucontext, StackFrame& frame, uintptr_t 
         // Do not record allocation unless allocated at least _interval bytes
         while (true) {
             u64 prev = _allocated_bytes;
-            u64 next = prev + rsize;
+            u64 next = prev + total_size;
             if (next < _interval) {
                 if (__sync_bool_compare_and_swap(&_allocated_bytes, prev, next)) {
                     return;
@@ -111,17 +113,17 @@ void AllocTracer::recordAllocation(void* ucontext, StackFrame& frame, uintptr_t 
         }
     }
 
+    AllocEvent event;
+    event._class_name = NULL;
+    event._total_size = total_size;
+    event._instance_size = instance_size;
+
     if (_supports_class_names) {
         VMSymbol* symbol = VMKlass::fromHandle(rklass)->name();
-        if (outside_tlab) {
-            // Invert the last bit to distinguish jmethodID from the allocation in new TLAB
-            Profiler::_instance.recordSample(ucontext, rsize, BCI_SYMBOL_OUTSIDE_TLAB, (jmethodID)((uintptr_t)symbol ^ 1));
-        } else {
-            Profiler::_instance.recordSample(ucontext, rsize, BCI_SYMBOL, (jmethodID)symbol);
-        }
-    } else {
-        Profiler::_instance.recordSample(ucontext, rsize, BCI_SYMBOL, NULL);
+        event._class_name = Profiler::_instance.classMap()->lookup(symbol->body(), symbol->length());
     }
+
+    Profiler::_instance.recordSample(ucontext, total_size, event_type, &event);
 }
 
 Error AllocTracer::check(Arguments& args) {

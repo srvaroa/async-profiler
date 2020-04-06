@@ -24,7 +24,8 @@ long ITimer::_interval;
 
 
 void ITimer::signalHandler(int signo, siginfo_t* siginfo, void* ucontext) {
-    Profiler::_instance.recordSample(ucontext, _interval, 0, NULL);
+    ExecutionEvent event;
+    Profiler::_instance.recordSample(ucontext, _interval, 0, &event);
 }
 
 Error ITimer::check(Arguments& args) {

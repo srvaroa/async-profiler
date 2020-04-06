@@ -83,9 +83,7 @@ void ThreadFilter::remove(int thread_id) {
     }
 }
 
-int ThreadFilter::collect(int* array, int max_count) {
-    int count = 0;
-
+void ThreadFilter::collect(std::vector<int>& v) {
     for (int i = 0; i < MAX_BITMAPS; i++) {
         u32* b = _bitmap[i];
         if (b != NULL) {
@@ -95,14 +93,11 @@ int ThreadFilter::collect(int* array, int max_count) {
                 if (word) {
                     for (int bit = 0; bit < 32; bit++) {
                         if (word & (1 << bit)) {
-                            if (count >= max_count) return count;
-                            array[count++] = start_id + j * 32 + bit;
+                            v.push_back(start_id + j * 32 + bit);
                         }
                     }
                 }
             }
         }
     }
-
-    return count;
 }

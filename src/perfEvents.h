@@ -33,8 +33,6 @@ class PerfEvents : public Engine {
     static Ring _ring;
     static bool _print_extended_warning;
 
-    static bool createForThread(int tid);
-    static void destroyForThread(int tid);
     static void signalHandler(int signo, siginfo_t* siginfo, void* ucontext);
 
   public:
@@ -48,19 +46,14 @@ class PerfEvents : public Engine {
     Error start(Arguments& args);
     void stop();
 
-    void onThreadStart(int tid) {
-        createForThread(tid);
-    }
-
-    void onThreadEnd(int tid) {
-        destroyForThread(tid);
-    }
-
     int getNativeTrace(void* ucontext, int tid, const void** callchain, int max_depth,
                        CodeCache* java_methods, CodeCache* runtime_stubs);
 
     static bool supported();
     static const char* getEventName(int event_id);
+
+    static bool createForThread(int tid);
+    static void destroyForThread(int tid);
 };
 
 #endif // _PERFEVENTS_H

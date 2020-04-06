@@ -23,7 +23,9 @@
 #include "arch.h"
 #include "arguments.h"
 #include "codeCache.h"
+#include "dictionary.h"
 #include "engine.h"
+#include "event.h"
 #include "flightRecorder.h"
 #include "mutex.h"
 #include "spinLock.h"
@@ -110,9 +112,12 @@ class Profiler {
     Mutex _thread_names_lock;
     std::map<int, std::string> _thread_names;
     std::map<jlong, int> _thread_ids;
+    Dictionary _class_map;
+    Dictionary _symbol_map;
     ThreadFilter _thread_filter;
     FlightRecorder _jfr;
     Engine* _engine;
+    int _events;
     time_t _start_time;
 
     u64 _total_samples;
@@ -218,6 +223,8 @@ class Profiler {
     u64 total_counter() { return _total_counter; }
     time_t uptime()     { return time(NULL) - _start_time; }
 
+    Dictionary* classMap() { return &_class_map; }
+    Dictionary* symbolMap() { return &_symbol_map; }
     ThreadFilter* threadFilter() { return &_thread_filter; }
 
     NativeCodeCache* jvmLibrary() { return _libjvm; }
@@ -234,7 +241,7 @@ class Profiler {
     void dumpFlameGraph(std::ostream& out, Arguments& args, bool tree);
     void dumpTraces(std::ostream& out, Arguments& args);
     void dumpFlat(std::ostream& out, Arguments& args);
-    void recordSample(void* ucontext, u64 counter, jint event_type, jmethodID event, ThreadState thread_state = THREAD_RUNNING);
+    void recordSample(void* ucontext, u64 counter, jint event_type, Event* event);
 
     const void* findSymbol(const char* name);
     const void* findSymbolByPrefix(const char* name);

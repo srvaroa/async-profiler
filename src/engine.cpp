@@ -28,13 +28,17 @@ bool Engine::requireNativeTrace() {
 
 int Engine::getNativeTrace(void* ucontext, int tid, const void** callchain, int max_depth,
                            CodeCache* java_methods, CodeCache* runtime_stubs) {
+    if (ucontext == NULL) {
+        return 0;
+    }
+
     StackFrame frame(ucontext);
     const void* pc = (const void*)frame.pc();
     uintptr_t fp = frame.fp();
     uintptr_t prev_fp = (uintptr_t)&fp;
 
     int depth = 0;
-    const void* const valid_pc = (const void*)0x1000;
+    const void* const valid_pc = (const void* const)0x1000;
 
     // Walk until the bottom of the stack or until the first Java frame
     while (depth < max_depth && pc >= valid_pc) {
