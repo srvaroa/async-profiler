@@ -99,12 +99,8 @@ void JNICALL LockTracer::UnsafeParkTrap(JNIEnv* env, jobject instance, jboolean 
     if (park_blocker != NULL) {
         park_end_time = OS::nanotime();
 
-        // Do not count synchronizers other than ReentrantLock, ReentrantReadWriteLock and Semaphore
         char* lock_name = getLockName(jvmti, env, park_blocker);
-        if (lock_name == NULL ||
-            strncmp(lock_name, "Ljava/util/concurrent/locks/ReentrantLock", 41) == 0 ||
-            strncmp(lock_name, "Ljava/util/concurrent/locks/ReentrantReadWriteLock", 50) == 0 ||
-            strncmp(lock_name, "Ljava/util/concurrent/Semaphore", 31) == 0) {
+        if (lock_name == NULL || isConcurrentLock(lock_name)) {
             recordContendedLock(BCI_PARK, park_start_time, park_end_time, lock_name, park_blocker, time);
         }
         jvmti->Deallocate((unsigned char*)lock_name);
@@ -127,6 +123,13 @@ char* LockTracer::getLockName(jvmtiEnv* jvmti, JNIEnv* env, jobject lock) {
         return NULL;
     }
     return class_name;
+}
+
+bool LockTracer::isConcurrentLock(const char* lock_name) {
+    // Do not count synchronizers other than ReentrantLock, ReentrantReadWriteLock and Semaphore
+    return strncmp(lock_name, "Ljava/util/concurrent/locks/ReentrantLock", 41) == 0 ||
+           strncmp(lock_name, "Ljava/util/concurrent/locks/ReentrantReadWriteLock", 50) == 0 ||
+           strncmp(lock_name, "Ljava/util/concurrent/Semaphore", 31) == 0;
 }
 
 void LockTracer::recordContendedLock(int event_type, u64 start_time, u64 end_time,

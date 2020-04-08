@@ -17,10 +17,15 @@
 #ifndef _EVENT_H
 #define _EVENT_H
 
+#include <stdint.h>
 #include "os.h"
 
 
 class Event {
+  public:
+    uintptr_t id() {
+        return *(uintptr_t*)this;
+    }
 };
 
 class ExecutionEvent : public Event {

@@ -213,10 +213,10 @@ const char* FrameName::name(ASGCT_CallFrame& frame, bool for_matching) {
         case BCI_ALLOC_OUTSIDE_TLAB:
         case BCI_LOCK:
         case BCI_PARK: {
-            const char* symbol = (const char*)((intptr_t)frame.method_id & ~1);
+            const char* symbol = (const char*)((uintptr_t)frame.method_id & ~1);
             char* class_name = javaClassName(symbol, strlen(symbol), _style | STYLE_DOTTED);
             if (!for_matching && !(_style & STYLE_DOTTED)) {
-                strcat(class_name, frame.bci == BCI_ALLOC_OUTSIDE_TLAB ? "_[k]" : "_[i]");
+                strcat(class_name, ((uintptr_t)frame.method_id & 1) ? "_[k]" : "_[i]");
             }
             return class_name;
         }

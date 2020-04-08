@@ -40,6 +40,7 @@
 
 Profiler Profiler::_instance;
 
+static NoopEngine noop_engine;
 static PerfEvents perf_events;
 static AllocTracer alloc_tracer;
 static LockTracer lock_tracer;
@@ -87,7 +88,7 @@ int Profiler::storeCallTrace(int num_frames, ASGCT_CallFrame* frames, u64 counte
         if (++i == MAX_CALLTRACES) i = 0;  // move to next slot
         if (i == bucket) return 0;         // the table is full
     }
-    
+
     // CallTrace hash found => atomically increment counter
     atomicInc(_traces[i]._samples);
     atomicInc(_traces[i]._counter, counter);
@@ -422,9 +423,9 @@ int Profiler::getJavaTraceJvmti(jvmtiFrameInfo* jvmti_frames, ASGCT_CallFrame* f
     return 0;
 }
 
-int Profiler::makeEventFrame(ASGCT_CallFrame* frames, jint event_type, jmethodID event) {
+int Profiler::makeEventFrame(ASGCT_CallFrame* frames, jint event_type, uintptr_t id) {
     frames[0].bci = event_type;
-    frames[0].method_id = event;
+    frames[0].method_id = (jmethodID)id;
     return 1;
 }
 
@@ -517,9 +518,9 @@ void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, Event*
     bool need_java_trace = true;
 
     int num_frames = 0;
-    if (event != NULL) {
-        // TODO: skip event for JFR
-        // num_frames = makeEventFrame(frames, event_type, event);
+    if (!_jfr.active() && event_type <= BCI_ALLOC && event_type >= BCI_PARK && event->id()) {
+        // TODO: distinguish AllocInNewTLAB/AllocOutsideTLAB events
+        num_frames = makeEventFrame(frames, event_type, event->id());
     }
     if (_cstack) {
         num_frames += getNativeTrace(ucontext, frames + num_frames, tid, &need_java_trace);
@@ -533,8 +534,8 @@ void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, Event*
         num_frames += getJavaTraceAsync(ucontext, frames + num_frames, _max_stack_depth);
     }
 
-    if (num_frames == 0 /* || (num_frames == 1 && event != NULL) */) {
-        num_frames += makeEventFrame(frames + num_frames, BCI_ERROR, (jmethodID)"no_Java_frame");
+    if (num_frames == 0) {
+        num_frames += makeEventFrame(frames + num_frames, BCI_ERROR, (uintptr_t)"no_Java_frame");
     } else if (event_type == BCI_INSTRUMENT) {
         // Skip Instrument.recordSample() method
         frames++;
@@ -542,7 +543,7 @@ void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, Event*
     }
 
     if (_add_thread_frame) {
-        num_frames += makeEventFrame(frames + num_frames, BCI_THREAD_ID, (jmethodID)(uintptr_t)tid);
+        num_frames += makeEventFrame(frames + num_frames, BCI_THREAD_ID, tid);
     }
 
     storeMethod(frames[0].method_id, frames[0].bci, counter);
@@ -707,7 +708,9 @@ bool Profiler::excludeTrace(FrameName* fn, CallTraceSample* trace) {
 }
 
 Engine* Profiler::selectEngine(const char* event_name) {
-    if (strcmp(event_name, EVENT_CPU) == 0) {
+    if (event_name == NULL) {
+        return &noop_engine;
+    } else if (strcmp(event_name, EVENT_CPU) == 0) {
         return PerfEvents::supported() ? (Engine*)&perf_events : (Engine*)&wall_clock;
     } else if (strcmp(event_name, EVENT_ALLOC) == 0) {
         return &alloc_tracer;

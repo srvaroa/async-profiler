@@ -34,6 +34,10 @@ class FlightRecorder {
     Error start(const char* file);
     void stop();
 
+    bool active() {
+        return _rec != NULL;
+    }
+
     void recordEvent(int lock_index, int tid, int call_trace_id,
                      int event_type, Event* event, u64 counter);
 };

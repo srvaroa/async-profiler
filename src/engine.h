@@ -35,4 +35,22 @@ class Engine {
                                CodeCache* java_methods, CodeCache* runtime_stubs);
 };
 
+class NoopEngine : public Engine {
+  public:
+    const char* name() {
+        return "noop";
+    }
+
+    const char* units() {
+        return "ns";
+    }
+
+    Error start(Arguments& args) {
+        return Error::OK;
+    }
+
+    void stop() {
+    }
+};
+
 #endif // _ENGINE_H
