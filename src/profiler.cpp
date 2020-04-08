@@ -522,7 +522,7 @@ void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, Event*
         // TODO: distinguish AllocInNewTLAB/AllocOutsideTLAB events
         num_frames = makeEventFrame(frames, event_type, event->id());
     }
-    if (_cstack) {
+    if (_cstack && event_type == 0) {
         num_frames += getNativeTrace(ucontext, frames + num_frames, tid, &need_java_trace);
     }
 
@@ -843,7 +843,7 @@ Error Profiler::start(Arguments& args, bool reset) {
     }
 
     _engine = selectEngine(args._event_desc);
-    _cstack = args._cstack != 'n';
+    _cstack = args._cstack ? args._cstack == 'y' : _engine->requireNativeTrace();
 
     error = _engine->start(args);
     if (error) {
