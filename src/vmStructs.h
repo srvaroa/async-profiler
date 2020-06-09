@@ -26,12 +26,13 @@ class VMStructs {
   protected:
     static jfieldID _eetop;
     static jfieldID _tid;
+    static jfieldID _klass;
     static intptr_t _env_offset;
     static int _klass_name_offset;
     static int _symbol_length_offset;
     static int _symbol_length_and_refcount_offset;
     static int _symbol_body_offset;
-    static int _class_klass_offset;
+    static int _class_loader_data_offset;
     static int _thread_osthread_offset;
     static int _thread_anchor_offset;
     static int _osthread_id_offset;
@@ -48,16 +49,24 @@ class VMStructs {
     static void init(NativeCodeCache* libjvm);
     static bool initThreadBridge();
 
-    static bool available() {
+    static bool hasClassNames() {
         return _klass_name_offset >= 0
             && (_symbol_length_offset >= 0 || _symbol_length_and_refcount_offset >= 0)
             && _symbol_body_offset >= 0
-            && _class_klass_offset >= 0;
+            && _klass != NULL;
     }
 
-    static bool hasPermGen() {
-        return _has_perm_gen;
+    static bool hasMethodList() {
+        return _class_loader_data_offset >= 0
+            && _klass != NULL;
     }
+};
+
+
+struct MethodList {
+    void* method[8];
+    int unused;
+    MethodList* next;
 };
 
 
@@ -79,6 +88,17 @@ class VMSymbol : VMStructs {
 
 class VMKlass : VMStructs {
   public:
+    static VMKlass* fromJavaClass(JNIEnv* env, jclass cls) {
+        if (_has_perm_gen) {
+            jobject klassOop = env->GetObjectField(cls, _klass);
+            return (VMKlass*)(*(uintptr_t**)klassOop + 2);
+        } else if (sizeof(VMKlass*) == 8) {
+            return (VMKlass*)(uintptr_t)env->GetLongField(cls, _klass);
+        } else {
+            return (VMKlass*)(uintptr_t)env->GetIntField(cls, _klass);
+        }
+    }
+
     static VMKlass* fromHandle(uintptr_t handle) {
         if (_has_perm_gen) {
             // On JDK 7 KlassHandle is a pointer to klassOop, hence one more indirection
@@ -91,12 +111,10 @@ class VMKlass : VMStructs {
     VMSymbol* name() {
         return *(VMSymbol**) at(_klass_name_offset);
     }
-};
 
-class java_lang_Class : VMStructs {
-  public:
-    VMKlass* klass() {
-        return *(VMKlass**) at(_class_klass_offset);
+    MethodList** methodList() {
+        char* class_loader_data = *(char**) at(_class_loader_data_offset);
+        return (MethodList**)(class_loader_data + sizeof(uintptr_t) * 6 + 8);
     }
 };
 

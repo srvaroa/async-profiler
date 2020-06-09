@@ -67,9 +67,10 @@ class VM {
     static jvmtiEnv* _jvmti;
     static bool _hotspot;
 
+    static void ready(jvmtiEnv* jvmti, JNIEnv* jni);
     static void* getLibraryHandle(const char* name);
-    static void loadMethodIDs(jvmtiEnv* jvmti, jclass klass);
-    static void loadAllMethodIDs(jvmtiEnv* jvmti);
+    static void loadMethodIDs(jvmtiEnv* jvmti, JNIEnv* jni, jclass klass);
+    static void loadAllMethodIDs(jvmtiEnv* jvmti, JNIEnv* jni);
 
   public:
     static void* _libjvm;
@@ -99,7 +100,7 @@ class VM {
     }
 
     static void JNICALL ClassPrepare(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread, jclass klass) {
-        loadMethodIDs(jvmti, klass);
+        loadMethodIDs(jvmti, jni, klass);
     }
 };
 

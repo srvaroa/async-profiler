@@ -140,7 +140,7 @@ Error AllocTracer::start(Arguments& args) {
         return error;
     }
 
-    _supports_class_names =  VMStructs::available();
+    _supports_class_names = VMStructs::hasClassNames();
     _interval = args._interval;
     _allocated_bytes = 0;
 

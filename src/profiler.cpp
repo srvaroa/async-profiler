@@ -222,6 +222,10 @@ const char* Profiler::asgctError(int code) {
     }
 }
 
+void Profiler::updateSymbols() {
+    Symbols::parseLibraries(_native_libs, _native_lib_count, MAX_NATIVE_LIBS);
+}
+
 const void* Profiler::findSymbol(const char* name) {
     const int native_lib_count = _native_lib_count;
     for (int i = 0; i < native_lib_count; i++) {
@@ -570,7 +574,7 @@ void Profiler::recordSample(void* ucontext, u64 counter, jint event_type, jmetho
 
 jboolean JNICALL Profiler::NativeLibraryLoadTrap(JNIEnv* env, jobject self, jstring name, jboolean builtin) {
     jboolean result = _instance._original_NativeLibrary_load(env, self, name, builtin);
-    Symbols::parseLibraries(_instance._native_libs, _instance._native_lib_count, MAX_NATIVE_LIBS);
+    _instance.updateSymbols();
     return result;
 }
 
@@ -749,28 +753,28 @@ Error Profiler::initJvmLibrary() {
         return Error("Could not find AsyncGetCallTrace function");
     }
 
-    _libjvm = findNativeLibrary((const void*)VM::_asyncGetCallTrace);
-    if (_libjvm == NULL) {
+    NativeCodeCache* libjvm = findNativeLibrary((const void*)VM::_asyncGetCallTrace);
+    if (libjvm == NULL) {
         return Error("Could not find libjvm among loaded libraries");
     }
 
-    VMStructs::init(_libjvm);
     if (!VMStructs::initThreadBridge()) {
         return Error("Could not find VMThread bridge. Unsupported JVM?");
     }
 
     _JvmtiEnv_GetStackTrace = (jvmtiError (*)(void*, void*, jint, jint, jvmtiFrameInfo*, jint*))
-        _libjvm->findSymbol("_ZN8JvmtiEnv13GetStackTraceEP10JavaThreadiiP15_jvmtiFrameInfoPi");
+        libjvm->findSymbol("_ZN8JvmtiEnv13GetStackTraceEP10JavaThreadiiP15_jvmtiFrameInfoPi");
 
-    _CodeCache_find_blob = (const void* (*)(const void*)) _libjvm->findSymbol("_ZN9CodeCache16find_blob_unsafeEPv");
+    _CodeCache_find_blob = (const void* (*)(const void*)) libjvm->findSymbol("_ZN9CodeCache16find_blob_unsafeEPv");
     if (_CodeCache_find_blob == NULL) {
-        _CodeCache_find_blob = (const void* (*)(const void*)) _libjvm->findSymbol("_ZN9CodeCache9find_blobEPv");
+        _CodeCache_find_blob = (const void* (*)(const void*)) libjvm->findSymbol("_ZN9CodeCache9find_blobEPv");
     }
 
     if (_CodeCache_find_blob == NULL) {
         fprintf(stderr, "WARNING: Install JVM debug symbols to improve profile accuracy\n");
     }
 
+    _libjvm = libjvm;
     return Error::OK;
 }
 
@@ -778,6 +782,11 @@ Error Profiler::start(Arguments& args, bool reset) {
     MutexLocker ml(_state_lock);
     if (_state != IDLE) {
         return Error("Profiler already started");
+    }
+
+    Error error = initJvmLibrary();
+    if (error) {
+        return error;
     }
 
     if (reset || _start_time == 0) {
@@ -830,11 +839,7 @@ Error Profiler::start(Arguments& args, bool reset) {
         }
     }
 
-    Symbols::parseLibraries(_native_libs, _native_lib_count, MAX_NATIVE_LIBS);
-    Error error = initJvmLibrary();
-    if (error) {
-        return error;
-    }
+    updateSymbols();
 
     _safe_mode = args._safe_mode | (VM::is_hotspot() ? 0 : HOTSPOT_ONLY);
 
@@ -898,7 +903,6 @@ Error Profiler::check(Arguments& args) {
         return Error("Profiler already started");
     }
 
-    Symbols::parseLibraries(_native_libs, _native_lib_count, MAX_NATIVE_LIBS);
     Error error = initJvmLibrary();
     if (error) {
         return error;

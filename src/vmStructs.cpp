@@ -22,12 +22,13 @@
 
 jfieldID VMStructs::_eetop;
 jfieldID VMStructs::_tid;
+jfieldID VMStructs::_klass = NULL;
 intptr_t VMStructs::_env_offset;
 int VMStructs::_klass_name_offset = -1;
 int VMStructs::_symbol_length_offset = -1;
 int VMStructs::_symbol_length_and_refcount_offset = -1;
 int VMStructs::_symbol_body_offset = -1;
-int VMStructs::_class_klass_offset = -1;
+int VMStructs::_class_loader_data_offset = -1;
 int VMStructs::_thread_osthread_offset = -1;
 int VMStructs::_thread_anchor_offset = -1;
 int VMStructs::_osthread_id_offset = -1;
@@ -76,9 +77,14 @@ void VMStructs::init(NativeCodeCache* libjvm) {
             } else if (strcmp(field, "_body") == 0) {
                 _symbol_body_offset = *(int*)(entry + offset_offset);
             }
+        } else if (strcmp(type, "InstanceKlass") == 0) {
+            if (strcmp(field, "_class_loader_data") == 0) {
+                _class_loader_data_offset = *(int*)(entry + offset_offset);
+            }
         } else if (strcmp(type, "java_lang_Class") == 0) {
             if (strcmp(field, "_klass_offset") == 0) {
-                _class_klass_offset = **(int**)(entry + address_offset);
+                int klass_offset = **(int**)(entry + address_offset);
+                _klass = (jfieldID)(uintptr_t)(klass_offset << 2 | 2);
             }
         } else if (strcmp(type, "JavaThread") == 0) {
             if (strcmp(field, "_osthread") == 0) {
