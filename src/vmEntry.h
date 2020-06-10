@@ -67,7 +67,7 @@ class VM {
     static jvmtiEnv* _jvmti;
     static bool _hotspot;
 
-    static void ready(jvmtiEnv* jvmti, JNIEnv* jni);
+    static void ready();
     static void* getLibraryHandle(const char* name);
     static void loadMethodIDs(jvmtiEnv* jvmti, JNIEnv* jni, jclass klass);
     static void loadAllMethodIDs(jvmtiEnv* jvmti, JNIEnv* jni);

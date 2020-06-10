@@ -24,10 +24,16 @@
 
 class VMStructs {
   protected:
+    typedef void JNICALL (*LockFunc)(void*);
+
+    static LockFunc _lock_func;
+    static LockFunc _unlock_func;
+
     static jfieldID _eetop;
     static jfieldID _tid;
     static jfieldID _klass;
     static intptr_t _env_offset;
+
     static int _klass_name_offset;
     static int _symbol_length_offset;
     static int _symbol_length_and_refcount_offset;
@@ -49,6 +55,7 @@ class VMStructs {
     static void init(NativeCodeCache* libjvm);
     static bool initThreadBridge();
 
+    // TODO: simplify
     static bool hasClassNames() {
         return _klass_name_offset >= 0
             && (_symbol_length_offset >= 0 || _symbol_length_and_refcount_offset >= 0)
@@ -56,8 +63,10 @@ class VMStructs {
             && _klass != NULL;
     }
 
-    static bool hasMethodList() {
+    static bool hasClassLoaderData() {
         return _class_loader_data_offset >= 0
+            && _lock_func != NULL
+            && _unlock_func != NULL
             && _klass != NULL;
     }
 };
@@ -76,13 +85,32 @@ class VMSymbol : VMStructs {
         if (_symbol_length_offset >= 0) {
           return *(unsigned short*) at(_symbol_length_offset);
         } else {
-          int length_and_refcount = *(unsigned int*) at(_symbol_length_and_refcount_offset);
-          return (length_and_refcount >> 16) & 0xffff;
+          return *(unsigned int*) at(_symbol_length_and_refcount_offset) >> 16;
         }
     }
 
     const char* body() {
         return at(_symbol_body_offset);
+    }
+};
+
+class ClassLoaderData : VMStructs {
+  private:
+    void* mutex() {
+        return *(void**) at(sizeof(uintptr_t) * 3);
+    }
+
+  public:
+    void lock() {
+        _lock_func(mutex());
+    }
+
+    void unlock() {
+        _unlock_func(mutex());
+    }
+
+    MethodList** methodList() {
+        return (MethodList**) at(sizeof(uintptr_t) * 6 + 8);
     }
 };
 
@@ -112,9 +140,8 @@ class VMKlass : VMStructs {
         return *(VMSymbol**) at(_klass_name_offset);
     }
 
-    MethodList** methodList() {
-        char* class_loader_data = *(char**) at(_class_loader_data_offset);
-        return (MethodList**)(class_loader_data + sizeof(uintptr_t) * 6 + 8);
+    ClassLoaderData* classLoaderData() {
+        return *(ClassLoaderData**) at(_class_loader_data_offset);
     }
 };
 

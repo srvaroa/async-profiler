@@ -51,6 +51,13 @@ void VM::init(JavaVM* vm, bool attach) {
         _hotspot = false;
     }
 
+    _libjvm = getLibraryHandle("libjvm.so");
+    _asyncGetCallTrace = (AsyncGetCallTrace)dlsym(_libjvm, "AsyncGetCallTrace");
+
+    if (attach) {
+        ready();
+    }
+
     jvmtiCapabilities capabilities = {0};
     capabilities.can_generate_all_class_hook_events = 1;
     capabilities.can_retransform_classes = 1;
@@ -87,18 +94,15 @@ void VM::init(JavaVM* vm, bool attach) {
     _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_COMPILED_METHOD_UNLOAD, NULL);
     _jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_DYNAMIC_CODE_GENERATED, NULL);
 
-    _libjvm = getLibraryHandle("libjvm.so");
-    _asyncGetCallTrace = (AsyncGetCallTrace)dlsym(_libjvm, "AsyncGetCallTrace");
-
     if (attach) {
-        ready(jvmti(), jni());
+        loadAllMethodIDs(jvmti(), jni());
         _jvmti->GenerateEvents(JVMTI_EVENT_DYNAMIC_CODE_GENERATED);
         _jvmti->GenerateEvents(JVMTI_EVENT_COMPILED_METHOD_LOAD);
     }
 }
 
 // Run late initialization when JVM is ready
-void VM::ready(jvmtiEnv* jvmti, JNIEnv* jni) {
+void VM::ready() {
     Profiler::_instance.updateSymbols();
     NativeCodeCache* libjvm = Profiler::_instance.findNativeLibrary((const void*)_asyncGetCallTrace);
     if (libjvm != NULL) {
@@ -106,7 +110,6 @@ void VM::ready(jvmtiEnv* jvmti, JNIEnv* jni) {
     }
 
     _libjava = getLibraryHandle("libjava.so");
-    loadAllMethodIDs(jvmti, jni);
 }
 
 void* VM::getLibraryHandle(const char* name) {
@@ -121,14 +124,15 @@ void* VM::getLibraryHandle(const char* name) {
 }
 
 void VM::loadMethodIDs(jvmtiEnv* jvmti, JNIEnv* jni, jclass klass) {
-    MethodList** head_ptr;
+    ClassLoaderData* cld;
     MethodList* old_list = NULL;
 
-    if (VMStructs::hasMethodList()) {
-        head_ptr = VMKlass::fromJavaClass(jni, klass)->methodList();
-        do {
-            old_list = *head_ptr;
-        } while (!__sync_bool_compare_and_swap(head_ptr, old_list, NULL));
+    if (VMStructs::hasClassLoaderData()) {
+        cld = VMKlass::fromJavaClass(jni, klass)->classLoaderData();
+        cld->lock();
+        old_list = *cld->methodList();
+        *cld->methodList() = NULL;
+        cld->unlock();
     }
 
     jint method_count;
@@ -138,12 +142,13 @@ void VM::loadMethodIDs(jvmtiEnv* jvmti, JNIEnv* jni, jclass klass) {
     }
 
     if (old_list != NULL) {
-        MethodList** tail_ptr;
-        do {
-            for (tail_ptr = head_ptr; *tail_ptr != NULL; ) {
-                tail_ptr = &(*tail_ptr)->next;
-            }
-        } while (!__sync_bool_compare_and_swap(tail_ptr, NULL, old_list));
+        cld->lock();
+        MethodList** tail = cld->methodList();
+        while (*tail != NULL) {
+            tail = &(*tail)->next;
+        }
+        *tail = old_list;
+        cld->unlock();
     }
 }
 
@@ -159,7 +164,9 @@ void VM::loadAllMethodIDs(jvmtiEnv* jvmti, JNIEnv* jni) {
 }
 
 void JNICALL VM::VMInit(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
-    ready(jvmti, jni);
+    ready();
+    loadAllMethodIDs(jvmti, jni);
+
     // Delayed start of profiler if agent has been loaded at VM bootstrap
     Profiler::_instance.run(_agent_args);
 }

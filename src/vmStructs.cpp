@@ -20,10 +20,14 @@
 #include "vmEntry.h"
 
 
+VMStructs::LockFunc VMStructs::_lock_func;
+VMStructs::LockFunc VMStructs::_unlock_func;
+
 jfieldID VMStructs::_eetop;
 jfieldID VMStructs::_tid;
 jfieldID VMStructs::_klass = NULL;
 intptr_t VMStructs::_env_offset;
+
 int VMStructs::_klass_name_offset = -1;
 int VMStructs::_symbol_length_offset = -1;
 int VMStructs::_symbol_length_and_refcount_offset = -1;
@@ -112,6 +116,9 @@ void VMStructs::init(NativeCodeCache* libjvm) {
 
         entry += stride;
     }
+
+    _lock_func = (LockFunc)libjvm->findSymbol("_ZN7Monitor28lock_without_safepoint_checkEv");
+    _unlock_func = (LockFunc)libjvm->findSymbol("_ZN7Monitor6unlockEv");
 }
 
 bool VMStructs::initThreadBridge() {
