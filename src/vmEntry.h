@@ -65,7 +65,7 @@ class VM {
   private:
     static JavaVM* _vm;
     static jvmtiEnv* _jvmti;
-    static bool _hotspot;
+    static int _hotspot_version;
 
     static void ready();
     static void* getLibraryHandle(const char* name);
@@ -88,8 +88,8 @@ class VM {
         return _vm->GetEnv((void**)&jni, JNI_VERSION_1_6) == 0 ? jni : NULL;
     }
 
-    static bool is_hotspot() {
-        return _hotspot;
+    static int hotspot_version() {
+        return _hotspot_version;
     }
 
     static void JNICALL VMInit(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread);

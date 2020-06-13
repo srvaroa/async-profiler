@@ -31,7 +31,7 @@ static Arguments _agent_args;
 
 JavaVM* VM::_vm;
 jvmtiEnv* VM::_jvmti = NULL;
-bool VM::_hotspot;
+int VM::_hotspot_version = 0;
 void* VM::_libjvm;
 void* VM::_libjava;
 AsyncGetCallTrace VM::_asyncGetCallTrace;
@@ -43,12 +43,19 @@ void VM::init(JavaVM* vm, bool attach) {
     _vm = vm;
     _vm->GetEnv((void**)&_jvmti, JVMTI_VERSION_1_0);
 
-    char* vm_name;
-    if (_jvmti->GetSystemProperty("java.vm.name", &vm_name) == 0) {
-        _hotspot = strstr(vm_name, "Zing") == NULL;
-        _jvmti->Deallocate((unsigned char*)vm_name);
-    } else {
-        _hotspot = false;
+    char* prop;
+    if (_jvmti->GetSystemProperty("java.vm.name", &prop) == 0) {
+        bool is_hotspot = strstr(prop, "OpenJDK") != NULL ||
+                          strstr(prop, "HotSpot") != NULL ||
+                          strstr(prop, "GraalVM") != NULL;
+        _jvmti->Deallocate((unsigned char*)prop);
+
+        if (is_hotspot && _jvmti->GetSystemProperty("java.vm.version", &prop) == 0) {
+            _hotspot_version = strncmp(prop, "25.", 3) == 0 ? 8 :
+                               strncmp(prop, "24.", 3) == 0 ? 7 :
+                               strncmp(prop, "20.", 3) == 0 ? 6 : 9;
+            _jvmti->Deallocate((unsigned char*)prop);
+        }
     }
 
     _libjvm = getLibraryHandle("libjvm.so");

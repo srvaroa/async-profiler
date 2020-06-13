@@ -29,7 +29,6 @@ Trap AllocTracer::_outside_tlab("_ZN11AllocTracer34send_allocation_outside_tlab_
 Trap AllocTracer::_in_new_tlab2("_ZN11AllocTracer27send_allocation_in_new_tlab");
 Trap AllocTracer::_outside_tlab2("_ZN11AllocTracer28send_allocation_outside_tlab");
 
-bool AllocTracer::_supports_class_names = false;
 u64 AllocTracer::_interval;
 volatile u64 AllocTracer::_allocated_bytes;
 
@@ -111,7 +110,7 @@ void AllocTracer::recordAllocation(void* ucontext, StackFrame& frame, uintptr_t 
         }
     }
 
-    if (_supports_class_names) {
+    if (VMStructs::hasClassNames()) {
         VMSymbol* symbol = VMKlass::fromHandle(rklass)->name();
         if (outside_tlab) {
             // Invert the last bit to distinguish jmethodID from the allocation in new TLAB
@@ -140,7 +139,6 @@ Error AllocTracer::start(Arguments& args) {
         return error;
     }
 
-    _supports_class_names = VMStructs::hasClassNames();
     _interval = args._interval;
     _allocated_bytes = 0;
 

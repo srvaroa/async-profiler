@@ -24,13 +24,8 @@ jlong LockTracer::_start_time = 0;
 jclass LockTracer::_LockSupport = NULL;
 jmethodID LockTracer::_getBlocker = NULL;
 UnsafeParkFunc LockTracer::_original_Unsafe_Park = NULL;
-bool LockTracer::_supports_lock_names = false;
 
 Error LockTracer::start(Arguments& args) {
-    // Some JVMs do not support VMStructs at all.
-    // Let's just record stack traces without lock names in these cases.
-    _supports_lock_names = VMStructs::hasClassNames();
-
     // Enable Java Monitor events
     jvmtiEnv* jvmti = VM::jvmti();
     jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_MONITOR_CONTENDED_ENTER, NULL);
@@ -136,7 +131,7 @@ jclass LockTracer::getParkBlockerClass(jvmtiEnv* jvmti, JNIEnv* env) {
 }
 
 void LockTracer::recordContendedLock(JNIEnv* env, jclass lock_class, jlong time) {
-    if (_supports_lock_names) {
+    if (VMStructs::hasClassNames()) {
         VMSymbol* lock_name = VMKlass::fromJavaClass(env, lock_class)->name();
         Profiler::_instance.recordSample(NULL, time, BCI_SYMBOL, (jmethodID)lock_name);
     } else {

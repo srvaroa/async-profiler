@@ -26,6 +26,10 @@ class VMStructs {
   protected:
     typedef void JNICALL (*LockFunc)(void*);
 
+    static bool _has_class_names;
+    static bool _has_class_loader_data;
+    static bool _has_perm_gen;
+
     static LockFunc _lock_func;
     static LockFunc _unlock_func;
 
@@ -45,7 +49,6 @@ class VMStructs {
     static int _anchor_sp_offset;
     static int _anchor_pc_offset;
     static int _frame_size_offset;
-    static bool _has_perm_gen;
 
     const char* at(int offset) {
         return (const char*)this + offset;
@@ -55,19 +58,12 @@ class VMStructs {
     static void init(NativeCodeCache* libjvm);
     static bool initThreadBridge();
 
-    // TODO: simplify
     static bool hasClassNames() {
-        return _klass_name_offset >= 0
-            && (_symbol_length_offset >= 0 || _symbol_length_and_refcount_offset >= 0)
-            && _symbol_body_offset >= 0
-            && _klass != NULL;
+        return _has_class_names;
     }
 
     static bool hasClassLoaderData() {
-        return _class_loader_data_offset >= 0
-            && _lock_func != NULL
-            && _unlock_func != NULL
-            && _klass != NULL;
+        return _has_class_loader_data;
     }
 };
 

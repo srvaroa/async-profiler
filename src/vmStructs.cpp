@@ -20,6 +20,10 @@
 #include "vmEntry.h"
 
 
+bool VMStructs::_has_class_names = false;
+bool VMStructs::_has_class_loader_data = false;
+bool VMStructs::_has_perm_gen = false;
+
 VMStructs::LockFunc VMStructs::_lock_func;
 VMStructs::LockFunc VMStructs::_unlock_func;
 
@@ -39,7 +43,6 @@ int VMStructs::_osthread_id_offset = -1;
 int VMStructs::_anchor_sp_offset = -1;
 int VMStructs::_anchor_pc_offset = -1;
 int VMStructs::_frame_size_offset = -1;
-bool VMStructs::_has_perm_gen = false;
 
 static uintptr_t readSymbol(NativeCodeCache* lib, const char* symbol_name) {
     const void* symbol = lib->findSymbol(symbol_name);
@@ -117,8 +120,20 @@ void VMStructs::init(NativeCodeCache* libjvm) {
         entry += stride;
     }
 
-    _lock_func = (LockFunc)libjvm->findSymbol("_ZN7Monitor28lock_without_safepoint_checkEv");
-    _unlock_func = (LockFunc)libjvm->findSymbol("_ZN7Monitor6unlockEv");
+    _has_class_names = _klass_name_offset >= 0
+            && (_symbol_length_offset >= 0 || _symbol_length_and_refcount_offset >= 0)
+            && _symbol_body_offset >= 0
+            && _klass != NULL;
+
+    if (VM::hotspot_version() == 8) {
+        _lock_func = (LockFunc)libjvm->findSymbol("_ZN7Monitor28lock_without_safepoint_checkEv");
+        _unlock_func = (LockFunc)libjvm->findSymbol("_ZN7Monitor6unlockEv");
+
+        _has_class_loader_data = _class_loader_data_offset >= 0
+            && _klass != NULL
+            && _lock_func != NULL
+            && _unlock_func != NULL;
+    }
 }
 
 bool VMStructs::initThreadBridge() {

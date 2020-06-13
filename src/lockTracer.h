@@ -29,7 +29,6 @@ class LockTracer : public Engine {
     static jclass _LockSupport;
     static jmethodID _getBlocker;
     static UnsafeParkFunc _original_Unsafe_Park;
-    static bool _supports_lock_names;
 
     static jclass getParkBlockerClass(jvmtiEnv* jvmti, JNIEnv* env);
     static void recordContendedLock(JNIEnv* env, jclass lock_class, jlong time);

@@ -841,7 +841,7 @@ Error Profiler::start(Arguments& args, bool reset) {
 
     updateSymbols();
 
-    _safe_mode = args._safe_mode | (VM::is_hotspot() ? 0 : HOTSPOT_ONLY);
+    _safe_mode = args._safe_mode | (VM::hotspot_version() ? 0 : HOTSPOT_ONLY);
 
     _add_thread_frame = args._threads && args._output != OUTPUT_JFR;
     _update_thread_names = (args._threads || args._output == OUTPUT_JFR) && VMThread::hasNativeId();
