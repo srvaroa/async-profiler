@@ -124,7 +124,7 @@ void AllocTracer::recordAllocation(void* ucontext, StackFrame& frame, uintptr_t 
 }
 
 Error AllocTracer::check(Arguments& args) {
-    NativeCodeCache* libjvm = Profiler::_instance.jvmLibrary();
+    NativeCodeCache* libjvm = VMStructs::libjvm();
     if (!(_in_new_tlab.resolve(libjvm) || _in_new_tlab2.resolve(libjvm)) ||
         !(_outside_tlab.resolve(libjvm) || _outside_tlab2.resolve(libjvm))) {
         return Error("No AllocTracer symbols found. Are JDK debug symbols installed?");

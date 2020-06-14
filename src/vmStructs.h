@@ -24,19 +24,12 @@
 
 class VMStructs {
   protected:
-    typedef void JNICALL (*LockFunc)(void*);
+    static NativeCodeCache* _libjvm;
 
     static bool _has_class_names;
     static bool _has_class_loader_data;
+    static bool _has_thread_bridge;
     static bool _has_perm_gen;
-
-    static LockFunc _lock_func;
-    static LockFunc _unlock_func;
-
-    static jfieldID _eetop;
-    static jfieldID _tid;
-    static jfieldID _klass;
-    static intptr_t _env_offset;
 
     static int _klass_name_offset;
     static int _symbol_length_offset;
@@ -50,13 +43,33 @@ class VMStructs {
     static int _anchor_pc_offset;
     static int _frame_size_offset;
 
+    static jfieldID _eetop;
+    static jfieldID _tid;
+    static jfieldID _klass;
+    static intptr_t _env_offset;
+
+    typedef void* (*FindBlobFunc)(const void*);
+    static FindBlobFunc _find_blob;
+
+    typedef void (*LockFunc)(void*);
+    static LockFunc _lock_func;
+    static LockFunc _unlock_func;
+
+    static uintptr_t readSymbol(const char* symbol_name);
+    static void initOffsets();
+    static void initJvmFunctions();
+    static void initThreadBridge();
+
     const char* at(int offset) {
         return (const char*)this + offset;
     }
 
   public:
     static void init(NativeCodeCache* libjvm);
-    static bool initThreadBridge();
+
+    static NativeCodeCache* libjvm() {
+        return _libjvm;
+    }
 
     static bool hasClassNames() {
         return _has_class_names;
@@ -65,6 +78,18 @@ class VMStructs {
     static bool hasClassLoaderData() {
         return _has_class_loader_data;
     }
+
+    static bool hasThreadBridge() {
+        return _has_thread_bridge;
+    }
+
+    typedef jvmtiError (*GetStackTraceFunc)(void* self, void* thread,
+                                            jint start_depth, jint max_frame_count,
+                                            jvmtiFrameInfo* frame_buffer, jint* count_ptr);
+    static GetStackTraceFunc _get_stack_trace;
+
+    typedef void (JNICALL *UnsafeParkFunc)(JNIEnv*, jobject, jboolean, jlong);
+    static UnsafeParkFunc _unsafe_park;
 };
 
 
@@ -175,6 +200,10 @@ class VMThread : VMStructs {
 
 class RuntimeStub : VMStructs {
   public:
+    static RuntimeStub* findBlob(const void* pc) {
+        return _find_blob != NULL ? (RuntimeStub*)_find_blob(pc) : NULL;
+    }
+
     int frameSize() {
         return *(int*) at(_frame_size_offset);
     }
