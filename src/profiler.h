@@ -132,6 +132,7 @@ class Profiler {
     ASGCT_CallFrame* _frame_buffer;
     int _frame_buffer_size;
     int _max_stack_depth;
+    int _safe_mode;
     CStack _cstack;
     volatile int _frame_buffer_index;
     bool _frame_buffer_overflow;
@@ -144,7 +145,6 @@ class Profiler {
     CodeCache _java_methods;
     NativeCodeCache _runtime_stubs;
     NativeCodeCache* _native_libs[MAX_NATIVE_LIBS];
-    NativeCodeCache* _libjvm;
     volatile int _native_lib_count;
 
     // Support for intercepting NativeLibrary.load()
@@ -159,11 +159,6 @@ class Profiler {
     void bindThreadSetNativeName(JNIEnv* env, ThreadSetNativeNameFunc entry);
 
     void switchNativeMethodTraps(bool enable);
-
-    jvmtiError (*_JvmtiEnv_GetStackTrace)(void* self, void* thread, jint start_depth, jint max_frame_count,
-                                          jvmtiFrameInfo* frame_buffer, jint* count_ptr);
-
-    const void* (*_CodeCache_find_blob)(const void* address);
 
     void addJavaMethod(const void* address, int length, jmethodID method);
     void removeJavaMethod(const void* address, jmethodID method);
@@ -190,7 +185,7 @@ class Profiler {
     void updateNativeThreadNames();
     bool excludeTrace(FrameName* fn, CallTraceSample* trace);
     Engine* selectEngine(const char* event_name);
-    Error initJvmLibrary();
+    Error checkJvmCapabilities();
 
   public:
     static Profiler _instance;
@@ -203,16 +198,14 @@ class Profiler {
         _frame_buffer(NULL),
         _frame_buffer_size(0),
         _max_stack_depth(0),
+        _safe_mode(0),
         _thread_events_state(JVMTI_DISABLE),
         _jit_lock(),
         _stubs_lock(),
         _java_methods(),
         _runtime_stubs("[stubs]"),
-        _libjvm(NULL),
         _native_lib_count(0),
-        _original_NativeLibrary_load(NULL),
-        _JvmtiEnv_GetStackTrace(NULL),
-        _CodeCache_find_blob(NULL) {
+        _original_NativeLibrary_load(NULL) {
 
         for (int i = 0; i < CONCURRENCY_LEVEL; i++) {
             _calltrace_buffer[i] = NULL;
@@ -226,8 +219,6 @@ class Profiler {
     Dictionary* classMap() { return &_class_map; }
     Dictionary* symbolMap() { return &_symbol_map; }
     ThreadFilter* threadFilter() { return &_thread_filter; }
-
-    NativeCodeCache* jvmLibrary() { return _libjvm; }
 
     void run(Arguments& args);
     void runInternal(Arguments& args, std::ostream& out);
@@ -243,6 +234,7 @@ class Profiler {
     void dumpFlat(std::ostream& out, Arguments& args);
     void recordSample(void* ucontext, u64 counter, jint event_type, Event* event);
 
+    void updateSymbols();
     const void* findSymbol(const char* name);
     const void* findSymbolByPrefix(const char* name);
     NativeCodeCache* findNativeLibrary(const void* address);
