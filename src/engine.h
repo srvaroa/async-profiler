@@ -22,6 +22,9 @@
 
 
 class Engine {
+  private:
+    static bool _enabled;
+
   public:
     virtual const char* name() = 0;
     virtual const char* units() = 0;
@@ -36,6 +39,10 @@ class Engine {
     virtual CStack cstack();
     virtual int getNativeTrace(void* ucontext, int tid, const void** callchain, int max_depth,
                                CodeCache* java_methods, CodeCache* runtime_stubs);
+
+    void enableEvents(bool enabled) {
+        _enabled = enabled;
+    }
 };
 
 #endif // _ENGINE_H

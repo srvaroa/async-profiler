@@ -112,22 +112,6 @@ struct PerfEventType {
         return 0;
     }
 
-    static void mangle(char* name, char* buf, size_t size) {
-        char* buf_end = buf + size;
-        strcpy(buf, "_ZN");
-        buf += 3;
-
-        for (char* c; (c = strstr(name, "::")) != NULL && buf < buf_end; name = c + 2) {
-            *c = 0;
-            buf += snprintf(buf, buf_end - buf, "%d%s", (int)strlen(name), name);
-        }
-
-        if (buf < buf_end) {
-            snprintf(buf, buf_end - buf, "%d%sE", (int)strlen(name), name);
-        }
-        buf_end[-1] = 0;
-    }
-
     static PerfEventType* findByType(__u32 type) {
         for (PerfEventType* event = AVAILABLE_EVENTS; ; event++) {
             if (event->type == type) {
@@ -177,20 +161,10 @@ struct PerfEventType {
         __u64 addr;
         if (strncmp(buf, "0x", 2) == 0) {
             addr = (__u64)strtoll(buf, NULL, 0);
-        } else if (strstr(buf, "::") != NULL) {
-            char mangled_name[256];
-            mangle(buf, mangled_name, sizeof(mangled_name));
-            addr = (__u64)(uintptr_t)Profiler::_instance.findSymbolByPrefix(mangled_name);
         } else {
             addr = (__u64)(uintptr_t)dlsym(RTLD_DEFAULT, buf);
             if (addr == 0) {
-                size_t len = strlen(buf);
-                if (len > 0 && buf[len - 1] == '*') {
-                    buf[len - 1] = 0;
-                    addr = (__u64)(uintptr_t)Profiler::_instance.findSymbolByPrefix(buf);
-                } else {
-                    addr = (__u64)(uintptr_t)Profiler::_instance.findSymbol(buf);
-                }
+                addr = (__u64)(uintptr_t)Profiler::_instance.resolveSymbol(buf);
             }
         }
 

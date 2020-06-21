@@ -179,6 +179,7 @@ class Profiler {
     void updateJavaThreadNames();
     void updateNativeThreadNames();
     bool excludeTrace(FrameName* fn, CallTraceSample* trace);
+    void mangle(const char* name, char* buf, size_t size);
     Engine* selectEngine(const char* event_name);
     Error checkJvmCapabilities();
 
@@ -228,8 +229,7 @@ class Profiler {
     void recordSample(void* ucontext, u64 counter, jint event_type, jmethodID event, ThreadState thread_state = THREAD_RUNNING);
 
     void updateSymbols();
-    const void* findSymbol(const char* name);
-    const void* findSymbolByPrefix(const char* name);
+    const void* resolveSymbol(const char* name);
     NativeCodeCache* findNativeLibrary(const void* address);
     const char* findNativeMethod(const void* address);
 

@@ -226,25 +226,49 @@ void Profiler::updateSymbols() {
     Symbols::parseLibraries(_native_libs, _native_lib_count, MAX_NATIVE_LIBS);
 }
 
-const void* Profiler::findSymbol(const char* name) {
-    const int native_lib_count = _native_lib_count;
-    for (int i = 0; i < native_lib_count; i++) {
-        const void* address = _native_libs[i]->findSymbol(name);
-        if (address != NULL) {
-            return address;
-        }
+void Profiler::mangle(const char* name, char* buf, size_t size) {
+    char* buf_end = buf + size;
+    strcpy(buf, "_ZN");
+    buf += 3;
+
+    const char* c;
+    while ((c = strstr(name, "::")) != NULL && buf + (c - name) + 4 < buf_end) {
+        buf += snprintf(buf, buf_end - buf, "%d", (int)(c - name));
+        memcpy(buf, name, c - name);
+        buf += c - name;
+        name = c + 2;
     }
-    return NULL;
+
+    if (buf < buf_end) {
+        snprintf(buf, buf_end - buf, "%d%sE*", (int)strlen(name), name);
+    }
+    buf_end[-1] = 0;
 }
 
-const void* Profiler::findSymbolByPrefix(const char* name) {
-    const int native_lib_count = _native_lib_count;
-    for (int i = 0; i < native_lib_count; i++) {
-        const void* address = _native_libs[i]->findSymbolByPrefix(name);
-        if (address != NULL) {
-            return address;
+const void* Profiler::resolveSymbol(const char* name) {
+    char mangled_name[256];
+    if (strstr(name, "::") != NULL) {
+        mangle(name, mangled_name, sizeof(mangled_name));
+        name = mangled_name;
+    }
+
+    size_t len = strlen(name);
+    if (len > 0 && name[len - 1] == '*') {
+        for (int i = 0; i < _native_lib_count; i++) {
+            const void* address = _native_libs[i]->findSymbolByPrefix(name, len - 1);
+            if (address != NULL) {
+                return address;
+            }
+        }
+    } else {
+        for (int i = 0; i < _native_lib_count; i++) {
+            const void* address = _native_libs[i]->findSymbol(name);
+            if (address != NULL) {
+                return address;
+            }
         }
     }
+
     return NULL;
 }
 
