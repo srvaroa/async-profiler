@@ -28,6 +28,7 @@
 #include "mutex.h"
 #include "spinLock.h"
 #include "threadFilter.h"
+#include "trap.h"
 #include "vmEntry.h"
 
 
@@ -107,6 +108,8 @@ class Profiler {
   private:
     Mutex _state_lock;
     State _state;
+    Trap _begin_trap;
+    Trap _end_trap;
     Mutex _thread_names_lock;
     std::map<int, std::string> _thread_names;
     std::map<jlong, int> _thread_ids;
@@ -155,6 +158,10 @@ class Profiler {
 
     void switchNativeMethodTraps(bool enable);
 
+    Error setupTraps(const char* begin, const char* end);
+    static void trapHandler(int signo, siginfo_t* siginfo, void* ucontext);
+    void trapHandlerImpl(void* ucontext);
+
     void addJavaMethod(const void* address, int length, jmethodID method);
     void removeJavaMethod(const void* address, jmethodID method);
     void addRuntimeStub(const void* address, int length, const char* name);
@@ -188,6 +195,8 @@ class Profiler {
 
     Profiler() :
         _state(IDLE),
+        _begin_trap(),
+        _end_trap(),
         _thread_filter(),
         _jfr(),
         _start_time(0),

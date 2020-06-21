@@ -22,6 +22,10 @@
 
 bool Trap::assign(const void* entry) {
     uintptr_t addr = (uintptr_t)entry;
+    if (addr == 0) {
+        _entry = NULL;
+        return true;
+    }
 
 #if defined(__arm__) || defined(__thumb__)
     if (addr & 1) {
@@ -30,21 +34,23 @@ bool Trap::assign(const void* entry) {
     }
 #endif
 
-    // Make the entry point writable, so we can rewrite instructions
-    long page_size = sysconf(_SC_PAGESIZE);
-    uintptr_t page_start = addr & -page_size;
-    if (mprotect((void*)page_start, page_size, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
-        return false;
+    if (_entry != (instruction_t*)addr) {
+        // Make the entry point writable, so we can rewrite instructions
+        long page_size = sysconf(_SC_PAGESIZE);
+        uintptr_t page_start = addr & -page_size;
+        if (mprotect((void*)page_start, page_size, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+            return false;
+        }
+        _entry = (instruction_t*)addr;
+        _saved_insn = *_entry;
     }
 
-    _entry = (instruction_t*)addr;
     return true;
 }
 
 // Insert breakpoint at the very first instruction
 void Trap::install() {
     if (_entry != NULL) {
-        _saved_insn = *_entry;
         *_entry = _breakpoint_insn;
         flushCache(_entry);
     }

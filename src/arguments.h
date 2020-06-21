@@ -128,6 +128,8 @@ class Arguments {
     Output _output;
     int _dump_traces;
     int _dump_flat;
+    const char* _begin;
+    const char* _end;
     // FlameGraph parameters
     const char* _title;
     int _width;
@@ -155,6 +157,8 @@ class Arguments {
         _output(OUTPUT_NONE),
         _dump_traces(0),
         _dump_flat(0),
+        _begin(NULL),
+        _end(NULL),
         _title("Flame Graph"),
         _width(1200),
         _height(16),

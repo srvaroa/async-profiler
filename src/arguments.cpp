@@ -82,6 +82,8 @@ const size_t EXTRA_BUF_SIZE = 512;
 //     ann             - annotate Java method names
 //     include=PATTERN - include stack traces containing PATTERN
 //     exclude=PATTERN - exclude stack traces containing PATTERN
+//     begin=FUNCTION  - begin profiling when FUNCTION is executed
+//     end=FUNCTION    - end profiling when FUNCTION is executed
 //     title=TITLE     - FlameGraph title
 //     width=PX        - FlameGraph image width
 //     height=PX       - FlameGraph frame height
@@ -230,6 +232,12 @@ Error Arguments::parse(const char* args) {
 
             CASE("ann")
                 _style |= STYLE_ANNOTATE;
+
+            CASE("begin")
+                _begin = value;
+
+            CASE("end")
+                _end = value;
 
             // FlameGraph options
             CASE("title")
