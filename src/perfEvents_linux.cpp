@@ -414,24 +414,26 @@ void PerfEvents::destroyForThread(int tid) {
 }
 
 void PerfEvents::signalHandler(int signo, siginfo_t* siginfo, void* ucontext) {
-    if (!_enabled || siginfo->si_code <= 0) {
+    if (siginfo->si_code <= 0) {
         // Looks like an external signal; don't treat as a profiling event
         return;
     }
 
-    u64 counter;
-    switch (_event_type->counter_arg) {
-        case 1: counter = StackFrame(ucontext).arg0(); break;
-        case 2: counter = StackFrame(ucontext).arg1(); break;
-        case 3: counter = StackFrame(ucontext).arg2(); break;
-        case 4: counter = StackFrame(ucontext).arg3(); break;
-        default:
-            if (read(siginfo->si_fd, &counter, sizeof(counter)) != sizeof(counter)) {
-                counter = 1;
-            }
+    if (_enabled) {
+        u64 counter;
+        switch (_event_type->counter_arg) {
+            case 1: counter = StackFrame(ucontext).arg0(); break;
+            case 2: counter = StackFrame(ucontext).arg1(); break;
+            case 3: counter = StackFrame(ucontext).arg2(); break;
+            case 4: counter = StackFrame(ucontext).arg3(); break;
+            default:
+                if (read(siginfo->si_fd, &counter, sizeof(counter)) != sizeof(counter)) {
+                    counter = 1;
+                }
+        }
+        Profiler::_instance.recordSample(ucontext, counter, 0, NULL);
     }
 
-    Profiler::_instance.recordSample(ucontext, counter, 0, NULL);
     ioctl(siginfo->si_fd, PERF_EVENT_IOC_RESET, 0);
     ioctl(siginfo->si_fd, PERF_EVENT_IOC_REFRESH, 1);
 }

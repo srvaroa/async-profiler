@@ -480,7 +480,7 @@ char* Instrument::_target_class = NULL;
 bool Instrument::_instrument_class_loaded = false;
 u64 Instrument::_interval;
 volatile u64 Instrument::_calls;
-volatile bool Instrument::_enabled;
+volatile bool Instrument::_enabled;  // FIXME: name
 
 Error Instrument::check(Arguments& args) {
     if (!_instrument_class_loaded) {
