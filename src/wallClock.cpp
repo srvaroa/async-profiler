@@ -124,6 +124,11 @@ void WallClock::timerLoop() {
     long long next_cycle_time = OS::nanotime();
 
     while (_running) {
+        if (!_enabled) {
+            sleep(_interval);
+            continue;
+        }
+
         if (sample_idle_threads) {
             // Try to keep the wall clock interval stable, regardless of the number of profiled threads
             int estimated_thread_count = thread_filter_enabled ? thread_filter->size() : thread_list->size();

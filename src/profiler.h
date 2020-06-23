@@ -158,7 +158,8 @@ class Profiler {
 
     void switchNativeMethodTraps(bool enable);
 
-    Error setupTraps(const char* begin, const char* end);
+    Error installTraps(const char* begin, const char* end);
+    void uninstallTraps();
     static void trapHandler(int signo, siginfo_t* siginfo, void* ucontext);
     void trapHandlerImpl(void* ucontext);
 

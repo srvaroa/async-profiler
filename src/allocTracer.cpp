@@ -35,9 +35,9 @@ void AllocTracer::signalHandler(int signo, siginfo_t* siginfo, void* ucontext) {
     bool outside_tlab;
 
     // PC points either to BREAKPOINT instruction or to the next one
-    if (frame.pc() - (uintptr_t)_in_new_tlab.entry() <= sizeof(instruction_t)) {
+    if (_in_new_tlab.covers(frame.pc())) {
         outside_tlab = false;
-    } else if (frame.pc() - (uintptr_t)_outside_tlab.entry() <= sizeof(instruction_t)) {
+    } else if (_outside_tlab.covers(frame.pc())) {
         outside_tlab = true;
     } else {
         // Not our trap
@@ -90,7 +90,7 @@ void AllocTracer::recordAllocation(void* ucontext, uintptr_t rklass, uintptr_t r
 }
 
 Error AllocTracer::check(Arguments& args) {
-    if (_in_new_tlab.entry() != NULL && _outside_tlab.entry() != NULL) {
+    if (_in_new_tlab.entry() != 0 && _outside_tlab.entry() != 0) {
         return Error::OK;
     }
 

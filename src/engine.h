@@ -22,8 +22,8 @@
 
 
 class Engine {
-  private:
-    static bool _enabled;
+  protected:
+    static volatile bool _enabled;
 
   public:
     virtual const char* name() = 0;

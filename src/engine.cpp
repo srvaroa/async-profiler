@@ -18,7 +18,7 @@
 #include "stackFrame.h"
 
 
-bool Engine::_enabled;
+volatile bool Engine::_enabled;
 
 Error Engine::check(Arguments& args) {
     return Error::OK;

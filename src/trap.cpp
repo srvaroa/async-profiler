@@ -14,35 +14,33 @@
  * limitations under the License.
  */
 
-#include <stdint.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include "trap.h"
 
 
-bool Trap::assign(const void* entry) {
-    uintptr_t addr = (uintptr_t)entry;
-    if (addr == 0) {
-        _entry = NULL;
+bool Trap::assign(const void* address) {
+    uintptr_t entry = (uintptr_t)address;
+    if (entry == 0) {
+        _entry = 0;
         return true;
     }
 
 #if defined(__arm__) || defined(__thumb__)
-    if (addr & 1) {
-        addr ^= 1;
+    if (entry & 1) {
+        entry ^= 1;
         _breakpoint_insn = BREAKPOINT_THUMB;
     }
 #endif
 
-    if (_entry != (instruction_t*)addr) {
+    if (entry != _entry) {
         // Make the entry point writable, so we can rewrite instructions
         long page_size = sysconf(_SC_PAGESIZE);
-        uintptr_t page_start = addr & -page_size;
-        if (mprotect((void*)page_start, page_size, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+        if (mprotect((void*)(entry & -page_size), page_size, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
             return false;
         }
-        _entry = (instruction_t*)addr;
-        _saved_insn = *_entry;
+        _entry = entry;
+        _saved_insn = *(instruction_t*)entry;
     }
 
     return true;
@@ -50,16 +48,16 @@ bool Trap::assign(const void* entry) {
 
 // Insert breakpoint at the very first instruction
 void Trap::install() {
-    if (_entry != NULL) {
-        *_entry = _breakpoint_insn;
+    if (_entry) {
+        *(instruction_t*)_entry = _breakpoint_insn;
         flushCache(_entry);
     }
 }
 
 // Clear breakpoint - restore the original instruction
 void Trap::uninstall() {
-    if (_entry != NULL) {
-        *_entry = _saved_insn;
+    if (_entry) {
+        *(instruction_t*)_entry = _saved_insn;
         flushCache(_entry);
     }
 }

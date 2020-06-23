@@ -69,14 +69,14 @@ void JNICALL LockTracer::MonitorContendedEntered(jvmtiEnv* jvmti, JNIEnv* env, j
     jvmti->GetTag(thread, &enter_time);
 
     // Time is meaningless if lock attempt has started before profiling
-    if (enter_time >= _start_time) {
+    if (_enabled && enter_time >= _start_time) {
         recordContendedLock(env, env->GetObjectClass(object), entered_time - enter_time);
     }
 }
 
 void JNICALL LockTracer::UnsafeParkTrap(JNIEnv* env, jobject instance, jboolean isAbsolute, jlong time) {
     jvmtiEnv* jvmti = VM::jvmti();
-    jclass lock_class = getParkBlockerClass(jvmti, env);
+    jclass lock_class = _enabled ? getParkBlockerClass(jvmti, env) : NULL;
     jlong park_start_time, park_end_time;
 
     if (lock_class != NULL) {

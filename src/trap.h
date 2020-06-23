@@ -17,22 +17,30 @@
 #ifndef _TRAP_H
 #define _TRAP_H
 
+#include <stdint.h>
 #include "arch.h"
 
 
 class Trap {
   private:
-    instruction_t* _entry;
+    uintptr_t _entry;
     instruction_t _breakpoint_insn;
     instruction_t _saved_insn;
 
   public:
-    Trap() : _entry(NULL), _breakpoint_insn(BREAKPOINT) {
+    Trap() : _entry(0), _breakpoint_insn(BREAKPOINT) {
     }
 
-    instruction_t* entry() { return _entry; }
+    uintptr_t entry() {
+        return _entry;
+    }
 
-    bool assign(const void* entry);
+    bool covers(uintptr_t pc) {
+        // PC points either to BREAKPOINT instruction or to the next one
+        return pc - _entry <= sizeof(instruction_t);
+    }
+
+    bool assign(const void* address);
     void install();
     void uninstall();
 };

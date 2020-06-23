@@ -674,22 +674,26 @@ void Profiler::switchNativeMethodTraps(bool enable) {
     env->ExceptionClear();
 }
 
-Error Profiler::setupTraps(const char* begin, const char* end) {
-    if (begin != NULL) {
+Error Profiler::installTraps(const char* begin, const char* end) {
+    if (begin == NULL) {
+        _begin_trap.assign(NULL);
+    } else {
         const void* begin_addr = resolveSymbol(begin);
         if (begin_addr == NULL || !_begin_trap.assign(begin_addr)) {
             return Error("Begin address not found");
         }
     }
 
-    if (end != NULL) {
+    if (end == NULL) {
+        _end_trap.assign(NULL);
+    } else {
         const void* end_addr = resolveSymbol(end);
         if (end_addr == NULL || !_end_trap.assign(end_addr)) {
             return Error("End address not found");
         }
     }
 
-    if (_begin_trap.entry() == NULL) {
+    if (_begin_trap.entry() == 0) {
         _engine->enableEvents(true);
     } else {
         _engine->enableEvents(false);
@@ -700,6 +704,11 @@ Error Profiler::setupTraps(const char* begin, const char* end) {
     return Error::OK;
 }
 
+void Profiler::uninstallTraps() {
+    _begin_trap.uninstall();
+    _end_trap.uninstall();
+}
+
 void Profiler::trapHandler(int signo, siginfo_t* siginfo, void* ucontext) {
     _instance.trapHandlerImpl(ucontext);
 }
@@ -707,17 +716,16 @@ void Profiler::trapHandler(int signo, siginfo_t* siginfo, void* ucontext) {
 void Profiler::trapHandlerImpl(void* ucontext) {
     StackFrame frame(ucontext);
 
-    // PC points either to BREAKPOINT instruction or to the next one
-    if (frame.pc() - (uintptr_t)_begin_trap.entry() <= sizeof(instruction_t)) {
+    if (_begin_trap.covers(frame.pc())) {
         _engine->enableEvents(true);
-        frame.pc() = (uintptr_t)_begin_trap.entry();
         _begin_trap.uninstall();
         _end_trap.install();
-    } else if (frame.pc() - (uintptr_t)_end_trap.entry() <= sizeof(instruction_t)) {
+        frame.pc() = _begin_trap.entry();
+    } else if (_end_trap.covers(frame.pc())) {
         _engine->enableEvents(false);
-        frame.pc() = (uintptr_t)_end_trap.entry();
         _end_trap.uninstall();
         _begin_trap.install();
+        frame.pc() = _end_trap.entry();
     }
 }
 
@@ -906,7 +914,7 @@ Error Profiler::start(Arguments& args, bool reset) {
         return Error("Branch stack is supported only with PMU events");
     }
 
-    error = setupTraps(args._begin, args._end);
+    error = installTraps(args._begin, args._end);
     if (error) {
         return error;
     }
@@ -914,16 +922,14 @@ Error Profiler::start(Arguments& args, bool reset) {
     if (args._output == OUTPUT_JFR) {
         error = _jfr.start(args._file);
         if (error) {
-            _begin_trap.uninstall();
-            _end_trap.uninstall();
+            uninstallTraps();
             return error;
         }
     }
 
     error = _engine->start(args);
     if (error) {
-        _begin_trap.uninstall();
-        _end_trap.uninstall();
+        uninstallTraps();
         _jfr.stop();
         return error;
     }
@@ -943,8 +949,7 @@ Error Profiler::stop() {
         return Error("Profiler is not active");
     }
 
-    _begin_trap.uninstall();
-    _end_trap.uninstall();
+    uninstallTraps();
     _engine->stop();
 
     switchNativeMethodTraps(false);

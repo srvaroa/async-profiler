@@ -414,7 +414,7 @@ void PerfEvents::destroyForThread(int tid) {
 }
 
 void PerfEvents::signalHandler(int signo, siginfo_t* siginfo, void* ucontext) {
-    if (siginfo->si_code <= 0) {
+    if (!_enabled || siginfo->si_code <= 0) {
         // Looks like an external signal; don't treat as a profiling event
         return;
     }

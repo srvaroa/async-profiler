@@ -582,6 +582,8 @@ void JNICALL Instrument::ClassFileLoadHook(jvmtiEnv* jvmti, JNIEnv* jni,
 }
 
 void Instrument::recordSample() {
+    if (!_enabled) return;
+
     if (_interval <= 1 || ((atomicInc(_calls) + 1) % _interval) == 0) {
         Profiler::_instance.recordSample(NULL, _interval, BCI_INSTRUMENT, NULL);
     }
