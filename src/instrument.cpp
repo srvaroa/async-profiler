@@ -480,7 +480,7 @@ char* Instrument::_target_class = NULL;
 bool Instrument::_instrument_class_loaded = false;
 u64 Instrument::_interval;
 volatile u64 Instrument::_calls;
-volatile bool Instrument::_enabled;  // FIXME: name
+volatile bool Instrument::_running;
 
 Error Instrument::check(Arguments& args) {
     if (!_instrument_class_loaded) {
@@ -508,7 +508,7 @@ Error Instrument::start(Arguments& args) {
     setupTargetClassAndMethod(args._event);
     _interval = args._interval ? args._interval : 1;
     _calls = 0;
-    _enabled = true;
+    _running = true;
 
     jvmtiEnv* jvmti = VM::jvmti();
     jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_FILE_LOAD_HOOK, NULL);
@@ -518,7 +518,7 @@ Error Instrument::start(Arguments& args) {
 }
 
 void Instrument::stop() {
-    _enabled = false;
+    _running = false;
 
     jvmtiEnv* jvmti = VM::jvmti();
     retransformMatchedClasses(jvmti);  // undo transformation
@@ -571,9 +571,7 @@ void JNICALL Instrument::ClassFileLoadHook(jvmtiEnv* jvmti, JNIEnv* jni,
                                            jint class_data_len, const u8* class_data,
                                            jint* new_class_data_len, u8** new_class_data) {
     // Do not retransform if the profiling has stopped
-    if (!_enabled) {
-        return;
-    }
+    if (!_running) return;
 
     if (name == NULL || strcmp(name, _target_class) == 0) {
         BytecodeRewriter rewriter(class_data, class_data_len, _target_class);
