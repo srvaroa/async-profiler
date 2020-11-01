@@ -24,11 +24,12 @@ const long DEFAULT_INTERVAL = 10000000;  // 10 ms
 const int DEFAULT_FRAMEBUF = 1000000;
 const int DEFAULT_JSTACKDEPTH = 2048;
 
-const char* const EVENT_CPU    = "cpu";
-const char* const EVENT_ALLOC  = "alloc";
-const char* const EVENT_LOCK   = "lock";
-const char* const EVENT_WALL   = "wall";
-const char* const EVENT_ITIMER = "itimer";
+const char* const EVENT_CPU       = "cpu";
+const char* const EVENT_ALLOC     = "alloc";
+const char* const EVENT_SURVIVOR  = "survivor";
+const char* const EVENT_LOCK      = "lock";
+const char* const EVENT_WALL      = "wall";
+const char* const EVENT_ITIMER    = "itimer";
 
 enum Action {
     ACTION_NONE,

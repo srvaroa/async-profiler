@@ -20,9 +20,10 @@ package one.profiler;
  * Predefined event names to use in {@link AsyncProfiler#start(String, long)}
  */
 public class Events {
-    public static final String CPU    = "cpu";
-    public static final String ALLOC  = "alloc";
-    public static final String LOCK   = "lock";
-    public static final String WALL   = "wall";
-    public static final String ITIMER = "itimer";
+    public static final String CPU      = "cpu";
+    public static final String ALLOC    = "alloc";
+    public static final String SURVIVOR = "survivor";
+    public static final String LOCK     = "lock";
+    public static final String WALL     = "wall";
+    public static final String ITIMER   = "itimer";
 }

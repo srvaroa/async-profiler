@@ -25,6 +25,7 @@
 #include "profiler.h"
 #include "perfEvents.h"
 #include "allocTracer.h"
+#include "survivorTracer.h"
 #include "lockTracer.h"
 #include "wallClock.h"
 #include "instrument.h"
@@ -42,6 +43,7 @@ Profiler Profiler::_instance;
 
 static PerfEvents perf_events;
 static AllocTracer alloc_tracer;
+static SurvivorTracer survivor_tracer;
 static LockTracer lock_tracer;
 static WallClock wall_clock;
 static ITimer itimer;
@@ -721,6 +723,8 @@ Engine* Profiler::selectEngine(const char* event_name) {
         return PerfEvents::supported() ? (Engine*)&perf_events : (Engine*)&wall_clock;
     } else if (strcmp(event_name, EVENT_ALLOC) == 0) {
         return &alloc_tracer;
+    } else if (strcmp(event_name, EVENT_SURVIVOR) == 0) {
+        return &survivor_tracer;
     } else if (strcmp(event_name, EVENT_LOCK) == 0) {
         return &lock_tracer;
     } else if (strcmp(event_name, EVENT_WALL) == 0) {
@@ -1109,6 +1113,7 @@ void Profiler::runInternal(Arguments& args, std::ostream& out) {
             out << "Basic events:" << std::endl;
             out << "  " << EVENT_CPU << std::endl;
             out << "  " << EVENT_ALLOC << std::endl;
+            out << "  " << EVENT_SURVIVOR << std::endl;
             out << "  " << EVENT_LOCK << std::endl;
             out << "  " << EVENT_WALL << std::endl;
             out << "  " << EVENT_ITIMER << std::endl;

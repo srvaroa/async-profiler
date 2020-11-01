@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef _ALLOCTRACER_H
-#define _ALLOCTRACER_H
+#ifndef _SURVIVORTRACER_H
+#define _SURVIVORTRACER_H
 
 #include <signal.h>
 #include <stdint.h>
@@ -26,20 +26,15 @@
 #include "trap.h"
 
 
-class AllocTracer : public Engine {
+class SurvivorTracer : public Engine {
   private:
-    // JDK 7-9
-    static Trap _in_new_tlab;
-    static Trap _outside_tlab;
-    // JDK 10+
-    static Trap _in_new_tlab2;
-    static Trap _outside_tlab2;
+    static Trap _copy_to_survivor;
 
     static u64 _interval;
     static volatile u64 _allocated_bytes;
 
     static void signalHandler(int signo, siginfo_t* siginfo, void* ucontext);
-    static void recordAllocation(void* ucontext, StackFrame& frame, uintptr_t rklass, uintptr_t rsize, bool outside_tlab);
+    static void recordPromotion(void* ucontext, StackFrame& frame, uintptr_t oop);
 
   public:
     const char* name() {
@@ -59,4 +54,4 @@ class AllocTracer : public Engine {
     void stop();
 };
 
-#endif // _ALLOCTRACER_H
+#endif // _SURVIVORTRACER_H

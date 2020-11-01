@@ -14,10 +14,7 @@
  * limitations under the License.
  */
 
-#include <unistd.h>
-#include <sys/mman.h>
 #include "allocTracer.h"
-#include "os.h"
 #include "profiler.h"
 #include "vmStructs.h"
 
@@ -31,51 +28,6 @@ Trap AllocTracer::_outside_tlab2("_ZN11AllocTracer28send_allocation_outside_tlab
 
 u64 AllocTracer::_interval;
 volatile u64 AllocTracer::_allocated_bytes;
-
-
-// Resolve the address of the intercepted function
-bool Trap::resolve(NativeCodeCache* libjvm) {
-    if (_entry != NULL) {
-        return true;
-    }
-
-    uintptr_t addr = (uintptr_t)libjvm->findSymbolByPrefix(_func_name);
-    if (addr == 0) {
-        return false;
-    }
-
-#if defined(__arm__) || defined(__thumb__)
-    if (addr & 1) {
-        addr ^= 1;
-        _breakpoint_insn = BREAKPOINT_THUMB;
-    }
-#endif
-
-    // Make the entry point writable, so we can rewrite instructions
-    long page_size = sysconf(_SC_PAGESIZE);
-    uintptr_t page_start = addr & -page_size;
-    mprotect((void*)page_start, page_size, PROT_READ | PROT_WRITE | PROT_EXEC);
-
-    _entry = (instruction_t*)addr;
-    return true;
-}
-
-// Insert breakpoint at the very first instruction
-void Trap::install() {
-    if (_entry != NULL) {
-        _saved_insn = *_entry;
-        *_entry = _breakpoint_insn;
-        flushCache(_entry);
-    }
-}
-
-// Clear breakpoint - restore the original instruction
-void Trap::uninstall() {
-    if (_entry != NULL) {
-        *_entry = _saved_insn;
-        flushCache(_entry);
-    }
-}
 
 
 // Called whenever our breakpoint trap is hit

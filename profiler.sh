@@ -13,7 +13,7 @@ usage() {
     echo "  collect           collect profile for the specified period of time"
     echo "                    and then stop (default action)"
     echo "Options:"
-    echo "  -e event          profiling event: cpu|alloc|lock|cache-misses etc."
+    echo "  -e event          profiling event: cpu|alloc|survivor|lock|cache-misses etc."
     echo "  -d duration       run profiling for <duration> seconds"
     echo "  -f filename       dump output to <filename>"
     echo "  -i interval       sampling interval in nanoseconds"
@@ -46,6 +46,7 @@ usage() {
     echo "         $0 start -i 999000 jps"
     echo "         $0 stop -o summary,flat jps"
     echo "         $0 -d 5 -e alloc MyAppName"
+    echo "         $0 -d 5 -e survivor MyAppName"
     exit 1
 }
 
